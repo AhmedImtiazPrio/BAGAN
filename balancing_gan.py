@@ -531,7 +531,7 @@ class BalancingGAN:
 
             shape = img_samples.shape
             
-            img_samples = img_samples.reshape((-1, shape[-4], shape[-1], shape[-3], shape[-2]))
+            img_samples = img_samples.reshape((-1, shape[-4], shape[-2], shape[-3], shape[-1]))
             print(shape)
             
             save_image_array(
@@ -585,7 +585,6 @@ class BalancingGAN:
                         self.generate_samples(c, 10, bg_train)
                         for c in range(0,self.nclasses)
                     ])
-
                     save_image_array(
                         img_samples,
                         '{}/plot_class_{}_epoch_{}.png'.format(self.res_dir, self.target_class_id, e)
@@ -623,7 +622,7 @@ class BalancingGAN:
                         img_samples = np.concatenate((img_samples, new_samples), axis=0)
 
                     shape = img_samples.shape
-                    img_samples = img_samples.reshape((-1, shape[-4], shape[-1], shape[-3], shape[-2]))
+                    img_samples = img_samples.reshape((-1, shape[-4], shape[-2], shape[-3], shape[-1]))
 
                     save_image_array(
                         img_samples,
