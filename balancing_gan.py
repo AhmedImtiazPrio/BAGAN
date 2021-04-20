@@ -623,7 +623,7 @@ class BalancingGAN:
                         img_samples = np.concatenate((img_samples, new_samples), axis=0)
 
                     shape = img_samples.shape
-                    img_samples = img_samples.reshape((-1, shape[-4], shape[-3], shape[-2], shape[-1]))
+                    img_samples = img_samples.reshape((-1, shape[-4], shape[-1], shape[-3], shape[-2]))
 
                     save_image_array(
                         img_samples,
