@@ -7,7 +7,8 @@ which accompanies this distribution, and is available at
 http://www.eclipse.org/legal/epl-v10.html
 """
 
-from tensorflow.examples.tutorials.mnist import input_data
+#from tensorflow.examples.tutorials.mnist import input_data
+import tensorflow_datasets as tfds
 import tensorflow as tf
 import numpy as np
 
@@ -23,22 +24,42 @@ class BatchGenerator:
 
         # Load data
         if dataset == 'MNIST':
-            mnist = input_data.read_data_sets("dataset/mnist", one_hot=False)
-
+            #mnist = input_data.read_data_sets("dataset/mnist", one_hot=False)
+            
             assert self.batch_size > 0, 'Batch size has to be a positive integer!'
 
             if self.data_src == self.TEST:
-                self.dataset_x = mnist.test.images
-                self.dataset_y = mnist.test.labels
+#                 self.dataset_x = mnist.test.images
+#                 self.dataset_y = mnist.test.labels
+                mnist = tfds.load('mnist',split='test')
+                dataset_x = []
+                dataset_y = []
+
+                for each in mnist:
+                    dataset_x.append(each['image'].numpy())
+                    dataset_y.append(each['label'].numpy())
+                self.dataset_x = np.asarray(dataset_x)
+                self.dataset_y = np.asarray(dataset_y)
+                
             else:
-                self.dataset_x = mnist.train.images
-                self.dataset_y = mnist.train.labels
+#                 self.dataset_x = mnist.train.images
+#                 self.dataset_y = mnist.train.labels
+                
+                mnist = tfds.load('mnist',split='train')
+                dataset_x = []
+                dataset_y = []
+
+                for each in mnist:
+                    dataset_x.append(each['image'].numpy())
+                    dataset_y.append(each['label'].numpy())
+                self.dataset_x = np.asarray(dataset_x)
+                self.dataset_y = np.asarray(dataset_y)
 
             # Normalize between -1 and 1
             self.dataset_x = (np.reshape(self.dataset_x, (self.dataset_x.shape[0], 28, 28)) - 0.5) * 2
 
             # Include 1 single color channel
-            self.dataset_x = np.expand_dims(self.dataset_x, axis=1)
+            self.dataset_x = np.expand_dims(self.dataset_x, axis=-1)
 
         elif dataset == 'CIFAR10':
             ((x, y), (x_test, y_test)) = tf.keras.datasets.cifar10.load_data()
@@ -51,7 +72,7 @@ class BatchGenerator:
                 self.dataset_y = y_test
 
             # Arrange x: channel first
-            self.dataset_x = np.transpose(self.dataset_x, axes=(0, 3, 1, 2))
+#             self.dataset_x = np.transpose(self.dataset_x, axes=(0, 3, 1, 2))
 
             # Normalize between -1 and 1
             self.dataset_x = (self.dataset_x - 127.5) / 127.5

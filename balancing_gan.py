@@ -11,7 +11,9 @@ import pickle
 from collections import defaultdict
 
 import keras.backend as K
-K.set_image_dim_ordering('th')
+#K.set_image_dim_ordering('th')
+K.set_image_data_format('channels_last')
+
 
 import keras
 from keras.layers.advanced_activations import LeakyReLU
@@ -23,11 +25,16 @@ import os
 import sys
 import re
 import numpy as np
+from tqdm import tqdm
 
 from keras.layers import Input, Dense, Reshape, Flatten, Embedding, Dropout
 
 from keras.layers import multiply as kmultiply
 from keras.layers import add as kadd
+
+# from tensorflow_probability.distributions import MultivariateNormalFullCovariance as multivariate_normal
+import tensorflow_probability as tfp
+# from jax.random import PRNGKey, multivariate_normal
 
 import csv
 
@@ -47,7 +54,7 @@ class BalancingGAN:
 
         cnn.add(Dense(1024, input_dim=latent_size, activation='relu', use_bias=False))
         cnn.add(Dense(128 * init_resolution * init_resolution, activation='relu', use_bias=False))
-        cnn.add(Reshape((128, init_resolution, init_resolution)))
+        cnn.add(Reshape((init_resolution, init_resolution, 128)))
         crt_res = init_resolution
 
         # upsample
@@ -77,7 +84,8 @@ class BalancingGAN:
 
         # The input-output interface
         self.generator = Model(inputs=latent, outputs=fake_image_from_latent)
-
+        print(self.generator.summary())
+        
     def _build_common_encoder(self, image, min_latent_res=8):
         resolution = self.resolution
         channels = self.channels
@@ -86,7 +94,7 @@ class BalancingGAN:
         cnn = Sequential()
 
         cnn.add(Conv2D(32, (3, 3), padding='same', strides=(2, 2),
-                       input_shape=(channels, resolution, resolution), use_bias=True))
+                       input_shape=(resolution, resolution, channels), use_bias=True))
         cnn.add(LeakyReLU())
         cnn.add(Dropout(0.3))
 
@@ -102,7 +110,7 @@ class BalancingGAN:
         cnn.add(LeakyReLU())
         cnn.add(Dropout(0.3))
 
-        while cnn.output_shape[-1] > min_latent_res:
+        while cnn.output_shape[-2] > min_latent_res:
             cnn.add(Conv2D(256, (3, 3), padding='same', strides=(2, 2), use_bias=True))
             cnn.add(LeakyReLU())
             cnn.add(Dropout(0.3))
@@ -112,7 +120,7 @@ class BalancingGAN:
             cnn.add(Dropout(0.3))
 
         cnn.add(Flatten())
-
+        print(cnn.summary())
         features = cnn(image)
         return features
 
@@ -120,17 +128,18 @@ class BalancingGAN:
     def build_reconstructor(self, latent_size, min_latent_res=8):
         resolution = self.resolution
         channels = self.channels
-        image = Input(shape=(channels, resolution, resolution))
+        image = Input(shape=(resolution, resolution, channels))
         features = self._build_common_encoder(image, min_latent_res)
 
         # Reconstructor specific
         latent = Dense(latent_size, activation='linear')(features)
         self.reconstructor = Model(inputs=image, outputs=latent)
+        print(self.reconstructor.summary())
 
     def build_discriminator(self, min_latent_res=8):
         resolution = self.resolution
         channels = self.channels
-        image = Input(shape=(channels, resolution, resolution))
+        image = Input(shape=(resolution, resolution, channels))
         features = self._build_common_encoder(image, min_latent_res)
 
         # Discriminator specific
@@ -138,6 +147,7 @@ class BalancingGAN:
             self.nclasses+1, activation='softmax', name='auxiliary'  # nclasses+1. The last class is: FAKE
         )(features)
         self.discriminator = Model(inputs=image, outputs=aux)
+        print(self.discriminator.summary())
 
     def generate_from_latent(self, latent):
         res = self.generator(latent)
@@ -149,8 +159,15 @@ class BalancingGAN:
         return res
 
     def generate_latent(self, c, bg=None, n_mix=10):  # c is a vector of classes
+#         res = np.array([
+#             np.random.multivariate_normal(self.means[e], self.covariances[e])
+#             for e in c
+#         ])
+        
+#         key = PRNGKey(np.random.randint(150*150*150))
         res = np.array([
-            np.random.multivariate_normal(self.means[e], self.covariances[e])
+            tfp.distributions.MultivariateNormalFullCovariance(self.means[e].astype(np.float32),
+                                                               self.covariances[e].astype(np.float32)).sample().numpy()
             for e in c
         ])
 
@@ -164,7 +181,7 @@ class BalancingGAN:
                  # No relevant difference noted
                  dratio_mode="uniform", gratio_mode="uniform",
                  adam_lr=0.00005, latent_size=100,
-                 res_dir = "./res-tmp", image_shape=[3,32,32], min_latent_res=8):
+                 res_dir = "./res-tmp", image_shape=[32,32,3], min_latent_res=8):
         self.gratio_mode = gratio_mode
         self.dratio_mode = dratio_mode
         self.classes = classes
@@ -172,9 +189,9 @@ class BalancingGAN:
         self.nclasses = len(classes)
         self.latent_size = latent_size
         self.res_dir = res_dir
-        self.channels = image_shape[0]
-        self.resolution = image_shape[1]
-        if self.resolution != image_shape[2]:
+        self.channels = image_shape[-1]
+        self.resolution = image_shape[0]
+        if self.resolution != image_shape[1]:
             print("Error: only squared images currently supported by balancingGAN")
             exit(1)
 
@@ -232,7 +249,7 @@ class BalancingGAN:
         self.generator.trainable = True
         self.reconstructor.trainable = True
 
-        img_for_reconstructor = Input(shape=(self.channels, self.resolution, self.resolution,))
+        img_for_reconstructor = Input(shape=(self.resolution, self.resolution, self.channels))
         img_reconstruct = self.generator(self.reconstructor(img_for_reconstructor))
 
         self.autoenc_0 = Model(inputs=img_for_reconstructor, outputs=img_reconstruct)
@@ -513,15 +530,17 @@ class BalancingGAN:
                 img_samples = np.concatenate((img_samples, new_samples), axis=0)
 
             shape = img_samples.shape
-            img_samples = img_samples.reshape((-1, shape[-4], shape[-3], shape[-2], shape[-1]))
-
+            
+            img_samples = img_samples.reshape((-1, shape[-4], shape[-1], shape[-3], shape[-2]))
+            print(shape)
+            
             save_image_array(
                 img_samples,
                 '{}/cmp_class_{}_init.png'.format(self.res_dir, self.target_class_id)
             )
 
             # Train
-            for e in range(start_e, epochs):
+            for e in tqdm(range(start_e, epochs)):
                 print('GAN train epoch: {}/{}'.format(e+1, epochs))
                 # train_disc_loss, train_gen_loss = self._train_one_epoch(copy.deepcopy(bg_train))
                 train_disc_loss, train_gen_loss = self._train_one_epoch(bg_train)

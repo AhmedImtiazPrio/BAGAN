@@ -74,13 +74,42 @@ if __name__ == '__main__':
     batch_size = 128
     dataset_name = options.dataset
 
+#     Set channels for mnist.
+#     channels = 1 if dataset_name == 'MNIST' else 3
+#     print('Using dataset: ', dataset_name)
+
+#     # Result directory
+#     res_dir = "./res_{}_dmode_{}_gmode_{}_unbalance_{}_epochs_{}_lr_{:f}_seed_{}".format(
+#         dataset_name, dratio_mode, gratio_mode, unbalance, options.epochs, adam_lr, options.seed
+#     )
+#     if not os.path.exists(res_dir):
+#         os.makedirs(res_dir)
+
+#     # Read initial data.
+#     print("read input data...")
+#     bg_train_full = BatchGenerator(BatchGenerator.TRAIN, batch_size,
+#                                    class_to_prune=None, unbalance=None, dataset=dataset_name)
+#     bg_test = BatchGenerator(BatchGenerator.TEST, batch_size,
+#                              class_to_prune=None, unbalance=None, dataset=dataset_name)
+
+#     print("input data loaded...")
+
+#     shape = bg_train_full.get_image_shape()
+
+#     min_latent_res = shape[-1]
+#     while min_latent_res > 8:
+#         min_latent_res = min_latent_res / 2
+#     min_latent_res = int(min_latent_res)
+
+#     classes = bg_train_full.get_label_table()
+    
     # Set channels for mnist.
     channels = 1 if dataset_name == 'MNIST' else 3
     print('Using dataset: ', dataset_name)
 
     # Result directory
     res_dir = "./res_{}_dmode_{}_gmode_{}_unbalance_{}_epochs_{}_lr_{:f}_seed_{}".format(
-        dataset_name, dratio_mode, gratio_mode, unbalance, options.epochs, adam_lr, options.seed
+        dataset_name, dratio_mode, gratio_mode, unbalance, gan_epochs, adam_lr, options.seed
     )
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
@@ -96,13 +125,13 @@ if __name__ == '__main__':
 
     shape = bg_train_full.get_image_shape()
 
-    min_latent_res = shape[-1]
+    min_latent_res = shape[-2]
     while min_latent_res > 8:
         min_latent_res = min_latent_res / 2
     min_latent_res = int(min_latent_res)
 
     classes = bg_train_full.get_label_table()
-
+    
     # Initialize statistics information
     gan_train_losses = defaultdict(list)
     gan_test_losses = defaultdict(list)
@@ -171,8 +200,8 @@ if __name__ == '__main__':
             )
 
         # Sample and save images
-        img_samples['class_{}'.format(c)] = gan.generate_samples(c=c, samples=10)
+#         img_samples['class_{}'.format(c)] = gan.generate_samples(c=c, samples=10)
 
-        save_image_array(np.array([img_samples['class_{}'.format(c)]]), '{}/plot_class_{}.png'.format(res_dir, c))
+#         save_image_array(np.array([img_samples['class_{}'.format(c)]]), '{}/plot_class_{}.png'.format(res_dir, c))
 
 
