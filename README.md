@@ -32,7 +32,7 @@ The following figure shows 0-image samples generated when dropping 97.5\% of 0-i
 
 ## Running the MNIST example
 
-This software has been tested on `tensorflow-1.5.0`.
+This software has been tested on `tensorflow-gpu==2.2`.
 
 To execute BAGAN for the MNIST example, run the command:
 `./run.sh`
